@@ -22,11 +22,8 @@ LAUNCH_HEIGHT_M = 1.5
 LAUNCH_SPEED_MS = 7.0
 LAUNCH_ANGLE_DEG = 15.0
 
-BASE_MASS_KG = 0.0025          # bare folded sheet of paper
-NOSE_WEIGHT_MASS_KG = 0.004    # extra tape/folds at full nose_weight=1.0
-LAYER_MASS_KG = 0.0006         # per extra nose fold layer
-
 CL_MAX = 1.2                   # crude stall limit
+MAX_PLAUSIBLE_SPEED_MS = 100.0 # integrator safety net, well above any real throw
 
 
 @dataclass
@@ -44,27 +41,33 @@ def _aero_coeffs(genome: Genome) -> tuple[float, float, float, float]:
     S = max(span * chord, 1e-4)
     aspect_ratio = (span * span) / S
 
-    cl_alpha = 2 * math.pi * aspect_ratio / (aspect_ratio + 2)
+    sweep = math.radians(genome.wing_sweep_deg)
+    # Sweeping the wing back reduces its effective lift-curve slope.
+    cl_alpha = 2 * math.pi * aspect_ratio / (aspect_ratio + 2) * math.cos(sweep)
 
     blunt_drag = (genome.nose_angle_deg / 60.0) * 0.04
-    layer_drag = genome.fold_layers * 0.002
+    layer_drag = genome.fold_layers * 0.003
     dihedral_drag = (genome.dihedral_deg / 30.0) * 0.01
-    cd0 = 0.02 + blunt_drag + layer_drag + dihedral_drag
+    fuselage_drag = genome.fuselage_width_m * 0.3 + genome.fuselage_length_m * 0.01
+    tail_drag = genome.tail_fin_height_m * 0.5
+    cd0 = 0.02 + blunt_drag + layer_drag + dihedral_drag + fuselage_drag + tail_drag
+    # ...but a swept wing also has less frontal area, cutting parasite drag a bit.
+    cd0 *= 1 - 0.15 * (genome.wing_sweep_deg / 45.0)
+
+    # Dihedral and a tail fin are what keep a paper plane tracking straight
+    # instead of wobbling/rolling; too little of both bleeds energy as drag.
+    stability = 0.5 * min(1.0, genome.dihedral_deg / 20.0) + 0.5 * min(
+        1.0, genome.tail_fin_height_m / 0.03
+    )
+    if stability < 0.3:
+        cd0 += (0.3 - stability) * 0.08
 
     return S, aspect_ratio, cl_alpha, cd0
 
 
-def _mass_kg(genome: Genome) -> float:
-    return (
-        BASE_MASS_KG
-        + genome.nose_weight * NOSE_WEIGHT_MASS_KG
-        + genome.fold_layers * LAYER_MASS_KG
-    )
-
-
 def simulate_flight(genome: Genome) -> FlightResult:
     S, aspect_ratio, cl_alpha, cd0 = _aero_coeffs(genome)
-    mass = _mass_kg(genome)
+    mass = genome.mass_kg()
     oswald_e = 0.7
 
     # Nose-heavy planes pitch down, trimming out at a lower angle of attack.
@@ -91,6 +94,10 @@ def simulate_flight(genome: Genome) -> FlightResult:
     while t < MAX_TIME and y > 0:
         v = math.hypot(vx, vy)
         if v < 1e-6:
+            break
+        if v > MAX_PLAUSIBLE_SPEED_MS:
+            # Numerical safety net: nothing a paper airplane does should
+            # get here, so stop rather than let Euler integration diverge.
             break
         lift = 0.5 * RHO * v * v * S * cl
         drag = 0.5 * RHO * v * v * S * cd

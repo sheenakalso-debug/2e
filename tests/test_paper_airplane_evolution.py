@@ -28,6 +28,39 @@ def test_mutate_stays_within_bounds():
             assert lo <= getattr(genome, name) <= hi
 
 
+def test_random_genomes_are_always_buildable():
+    """No genome may need more flat paper than one real sheet provides --
+    that's what keeps every design fair and foldable.
+    """
+    rng = random.Random(10)
+    for _ in range(200):
+        genome = random_genome(rng)
+        assert genome.is_buildable()
+
+
+def test_mutation_and_crossover_stay_buildable():
+    rng = random.Random(11)
+    a = random_genome(rng)
+    b = random_genome(rng)
+    for _ in range(200):
+        a = mutate(crossover(a, b, rng), rng, rate=0.6)
+        b = mutate(crossover(b, a, rng), rng, rate=0.6)
+        assert a.is_buildable()
+        assert b.is_buildable()
+
+
+def test_mass_is_fixed_by_the_shared_sheet():
+    """Every design is folded from the same sheet and folding doesn't
+    discard paper, so mass can't vary by genome -- that's what keeps
+    designs fair (no genome carries more or less material than another).
+    """
+    rng = random.Random(12)
+    masses = {random_genome(rng).mass_kg() for _ in range(50)}
+    assert len(masses) == 1
+    (mass,) = masses
+    assert 0.003 < mass < 0.010  # sane range for a real A4 sheet, in kg
+
+
 def test_crossover_gene_comes_from_a_parent():
     rng = random.Random(2)
     a = random_genome(rng)

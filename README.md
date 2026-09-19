@@ -102,9 +102,16 @@ independently: **distance**, **time aloft**, and **speed**.
 
 ## How it works
 
-- `paper_airplane_evolution/genome.py` — a paper airplane is encoded as 7
-  genes (wingspan, wing chord, nose weight, dihedral, nose taper angle,
-  trim angle, nose fold layers), each with realistic bounds.
+- `paper_airplane_evolution/genome.py` — a paper airplane is encoded as 11
+  genes (wingspan, wing chord, fuselage length/width, nose weight
+  distribution, dihedral, nose taper angle, trim angle, nose fold layers,
+  wing sweep, tail fin height). Every genome is folded from the same
+  single A4 sheet: `Genome.repaired()` scales paper-consuming dimensions
+  down whenever a combination would need more flat area than one sheet
+  provides, and mass is fixed to the sheet's actual weight (folding
+  doesn't add or discard paper), so no design can be bigger, heavier, or
+  more capable than what's physically foldable -- that's what keeps
+  every evolved design fair and buildable.
 - `paper_airplane_evolution/simulator.py` — a toy glide-dynamics model
   (lift/drag from wing area and aspect ratio, mass from paper + tape/folds)
   integrates the flight from a fixed launch until it lands, returning
