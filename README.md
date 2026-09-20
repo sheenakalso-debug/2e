@@ -144,3 +144,21 @@ Options: `--distance`, `--time`, `--speed` (toggle objectives on/off),
 ```bash
 pytest tests/test_paper_airplane_evolution.py
 ```
+
+## Visual, interactive version
+
+`paper_airplane_evolution/web/flight_test_bench.html` is a self-contained
+browser app — open it directly in any browser, no server or Python needed.
+It's a JavaScript port of the same genome/physics/GA engine (same bounds,
+same one-sheet fairness rule, same fixed mass) with a live interface:
+
+- Distance / time aloft / speed toggle switches, population and generation
+  sliders, and Run / Step / Reset controls (an Advanced panel exposes seed
+  and mutation rate for reproducible runs).
+- A flight-trace panel that animates the current best design's glide path.
+- A fitness-over-generations chart (best + average, with hover detail).
+- A population scatter (wingspan vs. nose-fold %) that visibly converges
+  generation by generation, colored by how close each design is to the
+  best fitness found so far.
+- A build sheet for the current best design, with a "Copy build sheet"
+  button.
