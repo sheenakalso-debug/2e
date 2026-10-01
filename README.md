@@ -92,3 +92,18 @@ network access or API credentials.
   benchmark database — double-check a borderline match before buying.
 - PA-API rate limits apply (initially ~1 request/second, scaling with sales
   volume).
+
+---
+
+# Wyrm & Wand Chess
+
+`fantasy_chess/index.html` is a self-contained browser chess game on a 10×8
+board with two fantasy pieces per side:
+
+- **Dragon** (rook + knight moves), starts on h1 / h8
+- **Wizard** (bishop + knight moves), starts on c1 / c8
+
+Full rules are enforced (check, checkmate, stalemate, castling, en passant,
+promotion to any piece including Dragon and Wizard, 50-move and repetition
+draws). Play against the built-in computer at three strengths or with two
+players on one screen. Open the file in any browser; no build step needed.
