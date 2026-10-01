@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flight Test Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --page-bg:#eef2ee;
+    --surface:#ffffff;
+    --surface-2:#f4f6f3;
+    --ink:#10181f;
+    --ink-soft:#4b5a63;
+    --muted:#7c8890;
+    --hairline:#dde3de;
+    --grid-line:#e4e8e2;
+    --accent:#2a78d6;
+    --accent-ink:#184f95;
+    --obj-distance:#2a78d6;
+    --obj-time:#eb6834;
+    --obj-speed:#1baf7a;
+    --chip-off-bg:#e6eae4;
+    --chip-off-ink:#7c8890;
+    --shadow:rgba(16,24,31,0.10);
+    --focus-ring:rgba(42,120,214,0.45);
+    --font-display:'Big Shoulders Display', system-ui, sans-serif;
+    --font-body:'Work Sans', system-ui, -apple-system, sans-serif;
+    --font-mono:'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page-bg:#12161a;
+      --surface:#1b2226;
+      --surface-2:#20282d;
+      --ink:#f2f5f3;
+      --ink-soft:#b9c3c6;
+      --muted:#8b969c;
+      --hairline:#2b3338;
+      --grid-line:#2b3338;
+      --accent:#3987e5;
+      --accent-ink:#bcd7f8;
+      --obj-distance:#3987e5;
+      --obj-time:#d95926;
+      --obj-speed:#199e70;
+      --chip-off-bg:#242c31;
+      --chip-off-ink:#8b969c;
+      --shadow:rgba(0,0,0,0.4);
+      --focus-ring:rgba(57,135,229,0.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page-bg:#12161a;
+    --surface:#1b2226;
+    --surface-2:#20282d;
+    --ink:#f2f5f3;
+    --ink-soft:#b9c3c6;
+    --muted:#8b969c;
+    --hairline:#2b3338;
+    --grid-line:#2b3338;
+    --accent:#3987e5;
+    --accent-ink:#bcd7f8;
+    --obj-distance:#3987e5;
+    --obj-time:#d95926;
+    --obj-speed:#199e70;
+    --chip-off-bg:#242c31;
+    --chip-off-ink:#8b969c;
+    --shadow:rgba(0,0,0,0.4);
+    --focus-ring:rgba(57,135,229,0.55);
+  }
+
+  body{ background:var(--page-bg); color:var(--ink); font-family:var(--font-body); }
+  *{ box-sizing:border-box; }
+  .app{ max-width:1180px; margin:0 auto; padding:28px 20px 48px; display:flex; flex-direction:column; gap:20px; }
+
+  .hero{ display:flex; flex-direction:column; gap:6px; padding-block:4px 6px; }
+  .hero .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .hero h1{ margin:0; font-family:var(--font-display); font-weight:800; font-size:clamp(32px,6vw,52px); line-height:.98; letter-spacing:.01em; text-wrap:balance; }
+  .hero p{ margin:0; max-width:62ch; color:var(--ink-soft); font-size:15px; line-height:1.55; }
+
+  .panel{ background:var(--surface); border:1px solid var(--hairline); border-radius:14px; padding:18px 18px 20px; box-shadow:0 1px 2px var(--shadow); }
+  .panel-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; font-family:var(--font-display); font-weight:700; font-size:19px; letter-spacing:.01em; margin:0 0 12px; }
+  .panel-head .sub{ font-family:var(--font-body); font-weight:500; font-size:12.5px; color:var(--muted); }
+
+  /* ---- controls ---- */
+  .controls{ display:flex; flex-direction:column; gap:16px; }
+  .obj-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .switch{ display:flex; align-items:center; gap:9px; padding:9px 14px 9px 10px; border-radius:999px; border:1px solid var(--hairline); background:var(--surface-2); cursor:pointer; font-family:var(--font-body); font-weight:600; font-size:13.5px; color:var(--ink-soft); transition:background .15s,border-color .15s,color .15s; }
+  .switch:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; }
+  .switch .dot{ width:10px; height:10px; border-radius:50%; background:var(--chip-off-ink); flex:none; transition:background .15s,box-shadow .15s; }
+  .switch[aria-checked="true"]{ color:var(--ink); border-color:transparent; }
+  .switch[aria-checked="true"] .dot{ box-shadow:0 0 0 3px color-mix(in srgb, var(--obj-c) 25%, transparent); }
+  .switch[data-obj="distance"][aria-checked="true"]{ background:color-mix(in srgb, var(--obj-distance) 16%, var(--surface)); }
+  .switch[data-obj="distance"][aria-checked="true"] .dot{ background:var(--obj-distance); --obj-c:var(--obj-distance); }
+  .switch[data-obj="time"][aria-checked="true"]{ background:color-mix(in srgb, var(--obj-time) 16%, var(--surface)); }
+  .switch[data-obj="time"][aria-checked="true"] .dot{ background:var(--obj-time); --obj-c:var(--obj-time); }
+  .switch[data-obj="speed"][aria-checked="true"]{ background:color-mix(in srgb, var(--obj-speed) 16%, var(--surface)); }
+  .switch[data-obj="speed"][aria-checked="true"] .dot{ background:var(--obj-speed); --obj-c:var(--obj-speed); }
+  .switch.locked{ cursor:not-allowed; opacity:.72; }
+
+  .sliders-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px 20px; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ display:flex; justify-content:space-between; font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .field label .val{ font-family:var(--font-mono); color:var(--ink); font-variant-numeric:tabular-nums; }
+  .field input[type="range"]{ accent-color:var(--accent); width:100%; }
+
+  .actions-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:2px; }
+  .btn{ font-family:var(--font-body); font-weight:600; font-size:13.5px; border-radius:9px; padding:9px 16px; border:1px solid var(--hairline); background:var(--surface-2); color:var(--ink); cursor:pointer; transition:background .15s,transform .1s; }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; }
+  .btn-primary{ background:var(--accent); border-color:transparent; color:#fff; }
+  .btn-ghost{ background:transparent; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .status{ font-family:var(--font-mono); font-size:12px; color:var(--muted); margin-left:auto; }
+
+  details.advanced{ border-top:1px solid var(--hairline); padding-top:12px; }
+  details.advanced summary{ cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+  .adv-body{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px 20px; margin-top:12px; }
+  .adv-body input[type="number"]{ font-family:var(--font-mono); font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid var(--hairline); background:var(--surface-2); color:var(--ink); width:100%; }
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+
+  /* ---- stage ---- */
+  .stage{ display:flex; flex-direction:column; gap:20px; }
+  .charts-row{ display:grid; grid-template-columns:1.15fr 1fr; gap:20px; }
+  @media (max-width:860px){ .charts-row{ grid-template-columns:1fr; } .sliders-row{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .sliders-row{ grid-template-columns:1fr; } }
+
+  svg.chart{ width:100%; height:auto; display:block; overflow:visible; }
+  svg.chart text{ font-family:var(--font-mono); font-size:10.5px; fill:var(--muted); }
+  svg.chart .axis-label{ font-family:var(--font-body); font-size:11px; font-weight:600; fill:var(--ink-soft); }
+  svg.chart .gridline{ stroke:var(--grid-line); stroke-width:1; }
+  svg.chart .baseline{ stroke:var(--hairline); stroke-width:1.5; }
+
+  .legend{ display:flex; gap:16px; margin-bottom:10px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .legend-item .key{ width:16px; height:2px; border-radius:2px; }
+
+  .stat-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .chip{ display:flex; flex-direction:column; gap:2px; padding:8px 12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--hairline); min-width:88px; }
+  .chip .label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+  .chip .value{ font-family:var(--font-mono); font-size:17px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .chip .value .unit{ font-size:11px; color:var(--muted); font-weight:500; margin-left:2px; }
+
+  /* ---- spec / build sheet ---- */
+  .spec-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:2px 22px; margin-bottom:14px; }
+  .spec-row{ display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px dashed var(--hairline); font-size:12.5px; }
+  .spec-row .k{ color:var(--ink-soft); }
+  .spec-row .v{ font-family:var(--font-mono); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  .meter{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .meter-track{ flex:1; height:8px; border-radius:5px; background:color-mix(in srgb, var(--accent) 16%, var(--surface-2)); overflow:hidden; }
+  .meter-fill{ height:100%; background:var(--accent); border-radius:5px; transition:width .3s; }
+  .meter-label{ font-family:var(--font-mono); font-size:11.5px; color:var(--muted); white-space:nowrap; }
+
+  .fold-list{ margin:0 0 16px; padding-left:20px; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--ink-soft); line-height:1.5; }
+  .fold-list li::marker{ color:var(--muted); font-family:var(--font-mono); font-size:11px; }
+  .fold-list b{ color:var(--ink); font-weight:600; }
+
+  .foot{ font-size:12px; color:var(--muted); line-height:1.6; padding-top:4px; border-top:1px solid var(--hairline); }
+  .foot b{ color:var(--ink-soft); }
+
+  .tooltip{ position:fixed; z-index:50; pointer-events:none; background:var(--ink); color:var(--page-bg); font-family:var(--font-mono); font-size:11.5px; line-height:1.5; padding:8px 10px; border-radius:8px; box-shadow:0 4px 16px var(--shadow); max-width:220px; transform:translate(-50%,-115%); }
+  .tooltip .t-title{ font-weight:600; margin-bottom:3px; }
+  .tooltip[hidden]{ display:none; }
+  .tooltip .t-row{ display:flex; justify-content:space-between; gap:12px; }
+  .tooltip .t-row .k{ opacity:.7; }
+
+  @media (prefers-reduced-motion:reduce){ * { transition:none !important; } }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="hero">
+    <div class="eyebrow">Genetic algorithm · flight-physics sim</div>
+    <h1>Flight Test Bench</h1>
+    <p>Evolves paper-airplane folds against whichever objectives you switch on. Every design is folded from one A4 sheet — same paper, same mass — so no shape wins by cheating the material.</p>
+  </header>
+
+  <section class="panel controls" aria-label="Evolution controls">
+    <div class="obj-row" role="group" aria-label="Objectives">
+      <button class="switch" type="button" role="switch" aria-checked="true" data-obj="distance"><span class="dot"></span>Distance</button>
+      <button class="switch" type="button" role="switch" aria-checked="true" data-obj="time"><span class="dot"></span>Time aloft</button>
+      <button class="switch" type="button" role="switch" aria-checked="true" data-obj="speed"><span class="dot"></span>Speed</button>
+    </div>
+
+    <div class="sliders-row">
+      <div class="field">
+        <label for="popRange">Population <span class="val" id="popVal">32</span></label>
+        <input type="range" id="popRange" min="10" max="80" step="2" value="32">
+      </div>
+      <div class="field">
+        <label for="genRange">Generations <span class="val" id="genVal">40</span></label>
+        <input type="range" id="genRange" min="8" max="100" step="2" value="40">
+      </div>
+      <div class="field">
+        <label for="speedRange">Playback <span class="val" id="speedVal">med</span></label>
+        <input type="range" id="speedRange" min="1" max="3" step="1" value="2">
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn btn-primary" id="runBtn" type="button">Run</button>
+      <button class="btn" id="stepBtn" type="button">Step ▸</button>
+      <button class="btn btn-ghost" id="resetBtn" type="button">Reset</button>
+      <span class="status" id="statusText">gen 0</span>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced</summary>
+      <div class="adv-body">
+        <div class="field">
+          <label for="seedInput">Seed (blank = random)</label>
+          <input type="number" id="seedInput" placeholder="e.g. 42">
+        </div>
+        <div class="field">
+          <label for="mutRange">Mutation rate <span class="val" id="mutVal">0.15</span></label>
+          <input type="range" id="mutRange" min="0.03" max="0.4" step="0.01" value="0.15">
+        </div>
+      </div>
+      <p class="hint">Population size and seed apply on the next Reset. Generations, playback speed and mutation rate apply immediately.</p>
+    </details>
+  </section>
+
+  <section class="stage">
+    <div class="panel traj-panel">
+      <div class="panel-head">Flight trace <span class="sub" id="trajSub">best of generation 0</span></div>
+      <svg class="chart" id="trajSvg" viewBox="0 0 640 220" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="stat-row" id="trajStats"></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="panel chart-panel">
+        <div class="panel-head">Fitness over generations</div>
+        <div class="legend" id="fitnessLegend">
+          <span class="legend-item"><span class="key" style="background:var(--accent)"></span>Best</span>
+          <span class="legend-item"><span class="key" style="background:var(--muted)"></span>Average</span>
+        </div>
+        <svg class="chart" id="fitnessSvg" viewBox="0 0 520 240" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="panel pop-panel">
+        <div class="panel-head">Population <span class="sub">wingspan vs. nose-fold %</span></div>
+        <svg class="chart" id="popSvg" viewBox="0 0 460 240" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel spec-card" aria-label="Best design build sheet">
+    <div class="panel-head">Best design — build sheet <span class="sub" id="specGen"></span></div>
+    <div class="spec-grid" id="specGrid"></div>
+    <div class="meter">
+      <div class="meter-track"><div class="meter-fill" id="paperFill" style="width:0%"></div></div>
+      <div class="meter-label" id="paperLabel">0% of one A4 sheet</div>
+    </div>
+    <ol class="fold-list" id="foldList"></ol>
+    <button class="btn btn-ghost" id="copyBtn" type="button">Copy build sheet</button>
+  </section>
+
+  <footer class="foot">
+    <b>Fairness rule:</b> every genome is folded from one 210×297mm sheet of 80gsm paper.
+    Wing, fuselage and tail dimensions are scaled down whenever a combination would need
+    more flat area than one sheet provides, and mass is fixed to that sheet's real weight
+    (folding concentrates paper, it never discards or adds it) — so no evolved design can
+    out-material another, only out-shape it.
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================== ENGINE ============================== */
+  const PAPER_WIDTH_M = 0.210, PAPER_HEIGHT_M = 0.297;
+  const PAPER_AREA_M2 = PAPER_WIDTH_M * PAPER_HEIGHT_M;
+  const USABLE_AREA_M2 = PAPER_AREA_M2 * 0.85;
+  const PAPER_GRAMMAGE_KGM2 = 0.080, OVERLAP_FACTOR = 1.3;
+
+  const PARAM_BOUNDS = {
+    wingspan_m: [0.08, 0.32],
+    wing_chord_m: [0.03, 0.14],
+    fuselage_length_m: [0.12, PAPER_HEIGHT_M],
+    fuselage_width_m: [0.015, 0.05],
+    nose_weight: [0.0, 1.0],
+    dihedral_deg: [0.0, 30.0],
+    nose_angle_deg: [10.0, 60.0],
+    trim_deg: [-5.0, 15.0],
+    fold_layers: [1.0, 4.0],
+    wing_sweep_deg: [0.0, 45.0],
+    tail_fin_height_m: [0.0, 0.04],
+  };
+
+  class RNG {
+    constructor(seed){ this.state = (seed >>> 0) || 1; this._spare = null; }
+    random(){
+      let t = (this.state += 0x6D2B79F5) >>> 0;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    uniform(lo,hi){ return lo + (hi-lo) * this.random(); }
+    gauss(mean,std){
+      if (this._spare !== null){ const v = this._spare; this._spare = null; return mean + std*v; }
+      let u,v,s;
+      do { u = this.random()*2-1; v = this.random()*2-1; s = u*u+v*v; } while (s>=1 || s===0);
+      const mul = Math.sqrt(-2*Math.log(s)/s);
+      this._spare = v*mul;
+      return mean + std*(u*mul);
+    }
+    choice(arr){ return arr[Math.floor(this.random()*arr.length)]; }
+    sampleIndices(n,k){
+      const idx = Array.from({length:n},(_,i)=>i);
+      for (let i=0;i<k;i++){ const j = i + Math.floor(this.random()*(n-i)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
+      return idx.slice(0,k);
+    }
+  }
+
+  function clipGenome(g){
+    const out = {};
+    for (const k in PARAM_BOUNDS){ const [lo,hi]=PARAM_BOUNDS[k]; out[k]=Math.min(hi,Math.max(lo,g[k])); }
+    return out;
+  }
+  function paperArea(g){
+    const wing = g.wingspan_m * g.wing_chord_m;
+    const fus = g.fuselage_length_m * g.fuselage_width_m;
+    const tail = 0.5 * g.tail_fin_height_m * (g.fuselage_width_m * 2);
+    return wing + fus + tail;
+  }
+  function massKg(){ return PAPER_AREA_M2 * PAPER_GRAMMAGE_KGM2 * OVERLAP_FACTOR; }
+  function isBuildable(g){ return paperArea(g) <= USABLE_AREA_M2 + 1e-9; }
+
+  function repairedGenome(g){
+    let genome = clipGenome(g);
+    for (let i=0;i<3;i++){
+      const area = paperArea(genome);
+      if (area <= USABLE_AREA_M2) return genome;
+      const scale = Math.sqrt(USABLE_AREA_M2/area);
+      genome = clipGenome({
+        ...genome,
+        wingspan_m: genome.wingspan_m*scale,
+        wing_chord_m: genome.wing_chord_m*scale,
+        fuselage_length_m: genome.fuselage_length_m*scale,
+        fuselage_width_m: genome.fuselage_width_m*scale,
+        tail_fin_height_m: genome.tail_fin_height_m*scale,
+      });
+    }
+    const [spanLo] = PARAM_BOUNDS.wingspan_m;
+    const [chordLo] = PARAM_BOUNDS.wing_chord_m;
+    while (paperArea(genome) > USABLE_AREA_M2 && genome.wingspan_m > spanLo){
+      genome = { ...genome,
+        wingspan_m: Math.max(spanLo, genome.wingspan_m*0.95),
+        wing_chord_m: Math.max(chordLo, genome.wing_chord_m*0.95) };
+    }
+    return genome;
+  }
+
+  function randomGenome(rng){
+    const g = {};
+    for (const k in PARAM_BOUNDS){ const [lo,hi]=PARAM_BOUNDS[k]; g[k]=rng.uniform(lo,hi); }
+    return repairedGenome(g);
+  }
+  function crossoverGenome(a,b,rng){
+    const g = {};
+    for (const k in PARAM_BOUNDS) g[k] = rng.random() < 0.5 ? a[k] : b[k];
+    return repairedGenome(g);
+  }
+  function mutateGenome(g,rng,rate){
+    const child = { ...g };
+    for (const k in PARAM_BOUNDS){
+      const [lo,hi] = PARAM_BOUNDS[k];
+      child[k] = child[k] + rng.gauss(0, rate*(hi-lo));
+    }
+    if (rng.random() < 0.1){
+      const keys = Object.keys(PARAM_BOUNDS);
+      const rk = rng.choice(keys);
+      const [lo,hi] = PARAM_BOUNDS[rk];
+      child[rk] = rng.uniform(lo,hi);
+    }
+    return repairedGenome(child);
+  }
+
+  const G=9.81, RHO=1.225, DT=0.01, MAX_TIME=30.0;
+  const LAUNCH_HEIGHT_M=1.5, LAUNCH_SPEED_MS=7.0, LAUNCH_ANGLE_DEG=15.0;
+  const CL_MAX=1.2, MAX_PLAUSIBLE_SPEED_MS=100.0;
+
+  function aeroCoeffs(g){
+    const span=g.wingspan_m, chord=g.wing_chord_m;
+    const S = Math.max(span*chord, 1e-4);
+    const AR = (span*span)/S;
+    const sweep = g.wing_sweep_deg*Math.PI/180;
+    const clAlpha = 2*Math.PI*AR/(AR+2)*Math.cos(sweep);
+    const bluntDrag = (g.nose_angle_deg/60)*0.04;
+    const layerDrag = g.fold_layers*0.003;
+    const dihedralDrag = (g.dihedral_deg/30)*0.01;
+    const fuselageDrag = g.fuselage_width_m*0.3 + g.fuselage_length_m*0.01;
+    const tailDrag = g.tail_fin_height_m*0.5;
+    let cd0 = 0.02 + bluntDrag + layerDrag + dihedralDrag + fuselageDrag + tailDrag;
+    cd0 *= 1 - 0.15*(g.wing_sweep_deg/45);
+    const stability = 0.5*Math.min(1,g.dihedral_deg/20) + 0.5*Math.min(1,g.tail_fin_height_m/0.03);
+    if (stability < 0.3) cd0 += (0.3-stability)*0.08;
+    return { S, AR, clAlpha, cd0 };
+  }
+
+  function simulateFlight(g){
+    const { S, AR, clAlpha, cd0 } = aeroCoeffs(g);
+    const mass = massKg();
+    const oswaldE = 0.7;
+    const alphaDeg = g.trim_deg - g.nose_weight*10;
+    const alpha = alphaDeg*Math.PI/180;
+    let cl = 0.05 + clAlpha*alpha;
+    const stallExcess = Math.max(0, Math.abs(cl)-CL_MAX);
+    cl = Math.max(-CL_MAX, Math.min(CL_MAX, cl));
+    const cdInduced = (cl*cl)/(Math.PI*oswaldE*Math.max(AR,0.1));
+    const cd = cd0 + cdInduced + 0.3*stallExcess;
+
+    const theta0 = LAUNCH_ANGLE_DEG*Math.PI/180;
+    let vx = LAUNCH_SPEED_MS*Math.cos(theta0), vy = LAUNCH_SPEED_MS*Math.sin(theta0);
+    let x=0, y=LAUNCH_HEIGHT_M, t=0, topSpeed=LAUNCH_SPEED_MS;
+    const trajectory = [{x,y}];
+    let prevX=x, prevY=y, prevT=t;
+
+    while (t < MAX_TIME && y > 0){
+      const v = Math.hypot(vx,vy);
+      if (v < 1e-6) break;
+      if (v > MAX_PLAUSIBLE_SPEED_MS) break;
+      const lift = 0.5*RHO*v*v*S*cl;
+      const drag = 0.5*RHO*v*v*S*cd;
+      const ux=vx/v, uy=vy/v, lx=-uy, ly=ux;
+      const fx = -drag*ux + lift*lx;
+      const fy = -drag*uy + lift*ly - mass*G;
+      const ax = fx/mass, ay = fy/mass;
+      prevX=x; prevY=y; prevT=t;
+      vx += ax*DT; vy += ay*DT; x += vx*DT; y += vy*DT; t += DT;
+      topSpeed = Math.max(topSpeed, v);
+      if (trajectory.length < 3000) trajectory.push({x,y});
+    }
+    if (y <= 0 && prevY > 0){
+      const frac = prevY !== y ? prevY/(prevY-y) : 0;
+      x = prevX + frac*(x-prevX);
+      t = prevT + frac*(t-prevT);
+    }
+    return { distance: Math.max(0,x), time: Math.max(0,t), topSpeed, trajectory };
+  }
+
+  const NORM = { distance:10, time:2, speed:8 };
+  function activeObjectives(obj){ return Object.keys(obj).filter(k=>obj[k]); }
+  function fitnessOf(result, obj){
+    const active = activeObjectives(obj);
+    if (!active.length) return 0;
+    let total = 0;
+    if (obj.distance) total += result.distance/NORM.distance;
+    if (obj.time) total += result.time/NORM.time;
+    if (obj.speed) total += result.topSpeed/NORM.speed;
+    return total/active.length;
+  }
+  function tournamentSelect(pop,scores,rng,k){
+    const idxs = rng.sampleIndices(pop.length, k);
+    let winner = idxs[0];
+    for (const i of idxs) if (scores[i] > scores[winner]) winner = i;
+    return pop[winner];
+  }
+  function stepGeneration(state){
+    const results = state.population.map(simulateFlight);
+    const scores = results.map(r => fitnessOf(r, state.objectives));
+    let bestIdx = 0;
+    for (let i=1;i<scores.length;i++) if (scores[i] > scores[bestIdx]) bestIdx = i;
+    const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+    const record = { gen: state.gen, best: scores[bestIdx], avg,
+      bestGenome: state.population[bestIdx], bestResult: results[bestIdx],
+      population: state.population, results, scores };
+    state.history.push(record);
+
+    const rankedIdx = [...scores.keys()].sort((a,b)=>scores[b]-scores[a]);
+    const elites = rankedIdx.slice(0, state.eliteCount).map(i => ({ ...state.population[i] }));
+    const next = [...elites];
+    while (next.length < state.population.length){
+      const pa = tournamentSelect(state.population, scores, state.rng, 3);
+      const pb = tournamentSelect(state.population, scores, state.rng, 3);
+      let child = crossoverGenome(pa, pb, state.rng);
+      child = mutateGenome(child, state.rng, state.mutationRate);
+      next.push(child);
+    }
+    state.population = next;
+    state.gen += 1;
+    return record;
+  }
+
+  /* ============================== UI STATE ============================== */
+  const els = {};
+  ["popRange","popVal","genRange","genVal","speedRange","speedVal","mutRange","mutVal",
+   "seedInput","runBtn","stepBtn","resetBtn","statusText","trajSvg","trajSub","trajStats",
+   "fitnessSvg","popSvg","specGrid","specGen","paperFill","paperLabel","foldList","copyBtn","tooltip"
+  ].forEach(id => els[id] = document.getElementById(id));
+  const switches = Array.from(document.querySelectorAll(".switch"));
+  const SPEED_MS = { 1: 650, 2: 320, 3: 90 };
+  const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let objectives = { distance:true, time:true, speed:true };
+  let state = null;
+  let running = false;
+  let runTimer = null;
+  let flightRAF = null;
+
+  function makeState(popSize, seed, mutationRate){
+    const rng = new RNG(seed);
+    return {
+      population: Array.from({length: popSize}, () => randomGenome(rng)),
+      rng, objectives, gen: 0, history: [], eliteCount: 2, mutationRate,
+    };
+  }
+
+  function currentSeed(){
+    const raw = els.seedInput.value.trim();
+    if (raw === "") return Math.floor(Math.random()*1e9) + 1;
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.floor(Math.abs(n)) + 1 : 1;
+  }
+
+  /* ============================== RENDER HELPERS ============================== */
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs){
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function niceStep(maxVal, ticks){
+    if (maxVal <= 0) return 1;
+    const raw = maxVal/ticks;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw/mag;
+    let step;
+    if (norm < 1.5) step = 1; else if (norm < 3) step = 2; else if (norm < 7) step = 5; else step = 10;
+    return step*mag;
+  }
+  function fmt(v, d){ return Number(v).toFixed(d); }
+
+  function showTooltip(x, y, rows, title){
+    const tt = els.tooltip;
+    tt.innerHTML = "";
+    if (title){ const t = document.createElement("div"); t.className="t-title"; t.textContent = title; tt.appendChild(t); }
+    rows.forEach(([k,v])=>{
+      const row = document.createElement("div"); row.className = "t-row";
+      const kEl = document.createElement("span"); kEl.className="k"; kEl.textContent = k;
+      const vEl = document.createElement("span"); vEl.textContent = v;
+      row.appendChild(kEl); row.appendChild(vEl); tt.appendChild(row);
+    });
+    tt.style.left = x + "px"; tt.style.top = y + "px";
+    tt.hidden = false;
+  }
+  function hideTooltip(){ els.tooltip.hidden = true; }
+
+  /* ---- trajectory panel ---- */
+  let trajPoints = [];
+  function renderTrajectory(record){
+    const svg = els.trajSvg;
+    svg.innerHTML = "";
+    const traj = record.bestResult.trajectory;
+    const W=640, H=220, padL=34, padR=14, padT=14, padB=26;
+    const maxX = Math.max(1, record.bestResult.distance) * 1.12;
+    const maxY = Math.max(LAUNCH_HEIGHT_M, ...traj.map(p=>p.y)) * 1.25;
+    const sx = (x)=> padL + (x/maxX)*(W-padL-padR);
+    const sy = (y)=> H-padB - (y/maxY)*(H-padT-padB);
+    trajPoints = traj.map(p=>({sx:sx(p.x), sy:sy(p.y), x:p.x, y:p.y}));
+
+    const xStep = niceStep(maxX,5), yStep = niceStep(maxY,4);
+    for (let gx=0; gx<=maxX+1e-9; gx+=xStep){
+      svg.appendChild(el("line",{class:"gridline",x1:sx(gx),x2:sx(gx),y1:padT,y2:H-padB}));
+      const t = el("text",{x:sx(gx),y:H-padB+14,"text-anchor":"middle"}); t.textContent = fmt(gx,gx<1?1:0); svg.appendChild(t);
+    }
+    for (let gy=0; gy<=maxY+1e-9; gy+=yStep){
+      svg.appendChild(el("line",{class:"gridline",x1:padL,x2:W-padR,y1:sy(gy),y2:sy(gy)}));
+      const t = el("text",{x:padL-6,y:sy(gy)+3,"text-anchor":"end"}); t.textContent = fmt(gy,gy<1?1:0); svg.appendChild(t);
+    }
+    svg.appendChild(el("line",{class:"baseline",x1:padL,x2:W-padR,y1:sy(0),y2:sy(0)}));
+    const xl = el("text",{class:"axis-label",x:(padL+W-padR)/2,y:H-4,"text-anchor":"middle"}); xl.textContent="distance (m)"; svg.appendChild(xl);
+    const yl = el("text",{class:"axis-label",x:12,y:(padT+H-padB)/2,"text-anchor":"middle",transform:`rotate(-90 12 ${(padT+H-padB)/2})`}); yl.textContent="height (m)"; svg.appendChild(yl);
+
+    const pathD = trajPoints.map((p,i)=> (i===0?"M":"L") + p.sx.toFixed(1) + " " + p.sy.toFixed(1)).join(" ");
+    svg.appendChild(el("path",{d:pathD, fill:"none", stroke:"var(--accent)", "stroke-width":2, "stroke-linecap":"round", "stroke-linejoin":"round"}));
+
+    const start = trajPoints[0], endPt = trajPoints[trajPoints.length-1];
+    svg.appendChild(el("circle",{cx:start.sx, cy:start.sy, r:4, fill:"var(--muted)", stroke:"var(--surface)", "stroke-width":2}));
+    svg.appendChild(el("circle",{cx:endPt.sx, cy:endPt.sy, r:5, fill:"var(--accent)", stroke:"var(--surface)", "stroke-width":2}));
+    const endLabel = el("text",{x:endPt.sx, y:Math.max(12, endPt.sy-10), "text-anchor":"middle", style:"font-weight:600;fill:var(--ink)"});
+    endLabel.textContent = fmt(record.bestResult.distance,1) + " m";
+    svg.appendChild(endLabel);
+
+    const marker = el("polygon",{points:"-7,0 6,-4 6,4", fill:"var(--accent)", stroke:"var(--surface)", "stroke-width":1});
+    marker.setAttribute("id","planeMarker");
+    svg.appendChild(marker);
+    animatePlane(record.bestResult.time);
+
+    els.trajSub.textContent = "best of generation " + record.gen;
+    els.trajStats.innerHTML = "";
+    const chips = [
+      ["distance", fmt(record.bestResult.distance,1), "m"],
+      ["time aloft", fmt(record.bestResult.time,2), "s"],
+      ["top speed", fmt(record.bestResult.topSpeed,1), "m/s"],
+    ];
+    chips.forEach(([label,val,unit])=>{
+      const c = document.createElement("div"); c.className="chip";
+      const l = document.createElement("div"); l.className="label"; l.textContent=label;
+      const v = document.createElement("div"); v.className="value";
+      v.textContent = val; const u = document.createElement("span"); u.className="unit"; u.textContent=unit; v.appendChild(u);
+      c.appendChild(l); c.appendChild(v); els.trajStats.appendChild(c);
+    });
+  }
+
+  function animatePlane(totalTime){
+    if (flightRAF) cancelAnimationFrame(flightRAF);
+    const marker = document.getElementById("planeMarker");
+    if (!marker || trajPoints.length < 2) return;
+    if (reducedMotion){
+      const p = trajPoints[trajPoints.length-1];
+      const prev = trajPoints[trajPoints.length-2];
+      const ang = Math.atan2(p.sy-prev.sy, p.sx-prev.sx)*180/Math.PI;
+      marker.setAttribute("transform", `translate(${p.sx} ${p.sy}) rotate(${ang})`);
+      return;
+    }
+    const loopMs = Math.max(1400, Math.min(5200, totalTime*550));
+    const start = performance.now();
+    function frame(now){
+      const t = ((now-start) % loopMs) / loopMs;
+      const idx = Math.min(trajPoints.length-1, Math.max(0, Math.floor(t*(trajPoints.length-1)) || 0));
+      const nextIdx = Math.min(trajPoints.length-1, idx+1);
+      const p = trajPoints[idx], q = trajPoints[nextIdx];
+      if (!p || !q){ flightRAF = requestAnimationFrame(frame); return; }
+      const ang = Math.atan2(q.sy-p.sy, q.sx-p.sx)*180/Math.PI;
+      marker.setAttribute("transform", `translate(${p.sx} ${p.sy}) rotate(${ang})`);
+      flightRAF = requestAnimationFrame(frame);
+    }
+    flightRAF = requestAnimationFrame(frame);
+  }
+
+  /* ---- fitness chart ---- */
+  function renderFitness(history){
+    const svg = els.fitnessSvg;
+    svg.innerHTML = "";
+    const W=520, H=240, padL=36, padR=12, padT=14, padB=26;
+    const maxGen = Math.max(1, history.length-1);
+    const maxFit = Math.max(0.1, ...history.map(r=>r.best), ...history.map(r=>r.avg)) * 1.15;
+    const sx = (g)=> padL + (g/maxGen)*(W-padL-padR);
+    const sy = (f)=> H-padB - (f/maxFit)*(H-padT-padB);
+
+    const xStep = niceStep(maxGen,5), yStep = niceStep(maxFit,4);
+    for (let gx=0; gx<=maxGen+1e-9; gx+=Math.max(1,xStep)){
+      svg.appendChild(el("line",{class:"gridline",x1:sx(gx),x2:sx(gx),y1:padT,y2:H-padB}));
+      const t = el("text",{x:sx(gx),y:H-padB+14,"text-anchor":"middle"}); t.textContent = Math.round(gx); svg.appendChild(t);
+    }
+    for (let gy=0; gy<=maxFit+1e-9; gy+=yStep){
+      svg.appendChild(el("line",{class:"gridline",x1:padL,x2:W-padR,y1:sy(gy),y2:sy(gy)}));
+      const t = el("text",{x:padL-6,y:sy(gy)+3,"text-anchor":"end"}); t.textContent = fmt(gy,1); svg.appendChild(t);
+    }
+    svg.appendChild(el("line",{class:"baseline",x1:padL,x2:W-padR,y1:sy(0),y2:sy(0)}));
+    const xl = el("text",{class:"axis-label",x:(padL+W-padR)/2,y:H-4,"text-anchor":"middle"}); xl.textContent="generation"; svg.appendChild(xl);
+
+    const avgD = history.map((r,i)=> (i===0?"M":"L") + sx(i).toFixed(1) + " " + sy(r.avg).toFixed(1)).join(" ");
+    const bestD = history.map((r,i)=> (i===0?"M":"L") + sx(i).toFixed(1) + " " + sy(r.best).toFixed(1)).join(" ");
+    svg.appendChild(el("path",{d:avgD, fill:"none", stroke:"var(--muted)", "stroke-width":2, "stroke-linecap":"round", "stroke-linejoin":"round"}));
+    svg.appendChild(el("path",{d:bestD, fill:"none", stroke:"var(--accent)", "stroke-width":2, "stroke-linecap":"round", "stroke-linejoin":"round"}));
+
+    const last = history[history.length-1];
+    svg.appendChild(el("circle",{cx:sx(history.length-1), cy:sy(last.best), r:4, fill:"var(--accent)", stroke:"var(--surface)", "stroke-width":2}));
+    svg.appendChild(el("circle",{cx:sx(history.length-1), cy:sy(last.avg), r:4, fill:"var(--muted)", stroke:"var(--surface)", "stroke-width":2}));
+
+    const hit = el("rect",{x:padL,y:padT,width:W-padL-padR,height:H-padT-padB, fill:"transparent"});
+    const crosshair = el("line",{x1:0,x2:0,y1:padT,y2:H-padB, stroke:"var(--hairline)", "stroke-width":1, visibility:"hidden"});
+    svg.appendChild(crosshair); svg.appendChild(hit);
+
+    function onMove(evt){
+      const rect = svg.getBoundingClientRect();
+      const px = (evt.clientX-rect.left) * (W/rect.width);
+      const g = Math.round(((px-padL)/(W-padL-padR))*maxGen);
+      const gi = Math.max(0, Math.min(history.length-1, g));
+      const rec = history[gi];
+      crosshair.setAttribute("x1", sx(gi)); crosshair.setAttribute("x2", sx(gi)); crosshair.setAttribute("visibility","visible");
+      showTooltip(evt.clientX, rect.top, [["best", fmt(rec.best,3)], ["average", fmt(rec.avg,3)]], "generation " + gi);
+    }
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerleave", ()=>{ crosshair.setAttribute("visibility","hidden"); hideTooltip(); });
+  }
+
+  /* ---- population scatter ---- */
+  let bestFitnessEver = 0;
+  function renderPopulation(record){
+    const svg = els.popSvg;
+    svg.innerHTML = "";
+    const W=460, H=240, padL=34, padR=16, padT=14, padB=28;
+    const [spanLo,spanHi] = PARAM_BOUNDS.wingspan_m;
+    const sx = (m)=> padL + ((m*100-spanLo*100)/((spanHi-spanLo)*100))*(W-padL-padR);
+    const sy = (pct)=> H-padB - (pct/100)*(H-padT-padB);
+
+    for (let gx=spanLo*100; gx<=spanHi*100+1e-9; gx+=8){
+      svg.appendChild(el("line",{class:"gridline",x1:sx(gx/100),x2:sx(gx/100),y1:padT,y2:H-padB}));
+      const t = el("text",{x:sx(gx/100),y:H-padB+14,"text-anchor":"middle"}); t.textContent = Math.round(gx); svg.appendChild(t);
+    }
+    for (let gy=0; gy<=100; gy+=25){
+      svg.appendChild(el("line",{class:"gridline",x1:padL,x2:W-padR,y1:sy(gy),y2:sy(gy)}));
+      const t = el("text",{x:padL-6,y:sy(gy)+3,"text-anchor":"end"}); t.textContent = gy; svg.appendChild(t);
+    }
+    svg.appendChild(el("line",{class:"baseline",x1:padL,x2:W-padR,y1:H-padB,y2:H-padB}));
+    const xl = el("text",{class:"axis-label",x:(padL+W-padR)/2,y:H-4,"text-anchor":"middle"}); xl.textContent="wingspan (cm)"; svg.appendChild(xl);
+    const yl = el("text",{class:"axis-label",x:10,y:(padT+H-padB)/2,"text-anchor":"middle",transform:`rotate(-90 10 ${(padT+H-padB)/2})`}); yl.textContent="nose fold %"; svg.appendChild(yl);
+
+    bestFitnessEver = Math.max(bestFitnessEver, record.best, 1e-6);
+    let bestIdx = 0;
+    for (let i=1;i<record.scores.length;i++) if (record.scores[i] > record.scores[bestIdx]) bestIdx = i;
+
+    const pts = [];
+    record.population.forEach((g,i)=>{
+      const cx = sx(g.wingspan_m), cy = sy(g.nose_weight*100);
+      const tNorm = Math.max(0, Math.min(1, record.scores[i]/bestFitnessEver));
+      const opacity = 0.22 + 0.78*tNorm;
+      const isBest = i === bestIdx;
+      const c = el("circle",{cx, cy, r:isBest?7:5, fill:"var(--accent)", "fill-opacity":opacity,
+        stroke: isBest ? "var(--accent)" : "var(--surface)", "stroke-width": isBest?2:1.5});
+      svg.appendChild(c);
+      pts.push({cx,cy,g,result:record.results[i],score:record.scores[i],isBest});
+    });
+    const best = pts[bestIdx];
+    const label = el("text",{x:best.cx, y:best.cy-12, "text-anchor":"middle", style:"font-weight:600;fill:var(--ink)"});
+    label.textContent = "best";
+    svg.appendChild(label);
+
+    const hit = el("rect",{x:0,y:0,width:W,height:H, fill:"transparent"});
+    svg.appendChild(hit);
+    function onMove(evt){
+      const rect = svg.getBoundingClientRect();
+      const px = (evt.clientX-rect.left) * (W/rect.width);
+      const py = (evt.clientY-rect.top) * (H/rect.height);
+      let nearest = null, best_d = Infinity;
+      pts.forEach(p=>{ const d = Math.hypot(p.cx-px,p.cy-py); if (d<best_d){ best_d=d; nearest=p; } });
+      if (!nearest || best_d > 26){ hideTooltip(); return; }
+      showTooltip(evt.clientX, rect.top,
+        [["wingspan", fmt(nearest.g.wingspan_m*100,1)+" cm"],
+         ["nose fold", fmt(nearest.g.nose_weight*100,0)+"%"],
+         ["fitness", fmt(nearest.score,3)],
+         ["distance", fmt(nearest.result.distance,1)+" m"]],
+        nearest.isBest ? "best of generation" : "design");
+    }
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerleave", hideTooltip);
+  }
+
+  /* ---- spec / build sheet ---- */
+  function describeGenome(g){
+    const wingNote = g.wingspan_m > 0.24 ? "wide glider wings" : g.wingspan_m < 0.14 ? "narrow dart wings" : "standard wings";
+    const noseNote = g.nose_angle_deg < 25 ? "sharp, pointed nose" : g.nose_angle_deg > 45 ? "blunt, rounded nose" : "medium taper nose";
+    const layers = Math.round(g.fold_layers);
+    const lines = [
+      `<b>Wings:</b> ${wingNote}, span ${fmt(g.wingspan_m*100,1)} cm, chord ${fmt(g.wing_chord_m*100,1)} cm, swept back ${fmt(g.wing_sweep_deg,0)}°`,
+      `<b>Fuselage:</b> spine ${fmt(g.fuselage_length_m*100,1)} cm long, ${fmt(g.fuselage_width_m*100,1)} cm wide`,
+      `<b>Nose:</b> ${noseNote} (${fmt(g.nose_angle_deg,0)}° taper), folded over ${layers} time${layers!==1?"s":""}`,
+      `<b>Weight balance:</b> concentrate ${fmt(g.nose_weight*100,0)}% of the fold near the nose`,
+      `<b>Dihedral:</b> fold both wingtips up ${fmt(g.dihedral_deg,0)}° from the centerline`,
+      g.tail_fin_height_m > 0.002 ? `<b>Tail fin:</b> fold a vertical fin ${fmt(g.tail_fin_height_m*100,1)} cm tall at the back` : `<b>Tail fin:</b> none`,
+      `<b>Trim:</b> bend the trailing flaps ${fmt(Math.abs(g.trim_deg),1)}° ${g.trim_deg>=0?"up":"down"}`,
+    ];
+    return lines;
+  }
+
+  function renderSpec(record){
+    const g = record.bestGenome, r = record.bestResult;
+    els.specGen.textContent = "gen " + record.gen + " · fitness " + fmt(record.best,3);
+    const rows = [
+      ["Wingspan", fmt(g.wingspan_m*100,1)+" cm"],
+      ["Wing chord", fmt(g.wing_chord_m*100,1)+" cm"],
+      ["Wing sweep", fmt(g.wing_sweep_deg,0)+"°"],
+      ["Dihedral", fmt(g.dihedral_deg,0)+"°"],
+      ["Fuselage length", fmt(g.fuselage_length_m*100,1)+" cm"],
+      ["Fuselage width", fmt(g.fuselage_width_m*100,1)+" cm"],
+      ["Nose taper", fmt(g.nose_angle_deg,0)+"°"],
+      ["Nose fold layers", Math.round(g.fold_layers)],
+      ["Nose weight (CG)", fmt(g.nose_weight*100,0)+"%"],
+      ["Tail fin height", fmt(g.tail_fin_height_m*100,1)+" cm"],
+      ["Trim", fmt(g.trim_deg,1)+"°"],
+      ["Mass", fmt(massKg()*1000,2)+" g"],
+    ];
+    els.specGrid.innerHTML = "";
+    rows.forEach(([k,v])=>{
+      const row = document.createElement("div"); row.className="spec-row";
+      const kEl = document.createElement("span"); kEl.className="k"; kEl.textContent=k;
+      const vEl = document.createElement("span"); vEl.className="v"; vEl.textContent=v;
+      row.appendChild(kEl); row.appendChild(vEl); els.specGrid.appendChild(row);
+    });
+
+    const pct = 100*paperArea(g)/USABLE_AREA_M2;
+    els.paperFill.style.width = Math.min(100,pct) + "%";
+    els.paperLabel.textContent = fmt(pct,0) + "% of one A4 sheet used";
+
+    els.foldList.innerHTML = describeGenome(g).map(l=>`<li>${l}</li>`).join("");
+
+    els.copyBtn.onclick = async () => {
+      const text = "PAPER AIRPLANE BUILD SHEET (gen " + record.gen + ")\n" +
+        rows.map(([k,v])=>k+": "+v).join("\n") + "\n\n" +
+        "distance: " + fmt(r.distance,2) + " m\n" +
+        "time aloft: " + fmt(r.time,2) + " s\n" +
+        "top speed: " + fmt(r.topSpeed,2) + " m/s\n\n" +
+        describeGenome(g).map(l=>l.replace(/<\/?b>/g,"")).join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        els.copyBtn.textContent = "Copied ✓";
+      } catch(e){
+        els.copyBtn.textContent = "Select text above to copy";
+      }
+      setTimeout(()=>{ els.copyBtn.textContent = "Copy build sheet"; }, 1800);
+    };
+  }
+
+  /* ============================== MAIN LOOP ============================== */
+  function renderAll(){
+    const record = state.history[state.history.length-1];
+    renderTrajectory(record);
+    renderFitness(state.history);
+    renderPopulation(record);
+    renderSpec(record);
+    const target = Number(els.genRange.value);
+    els.statusText.textContent = "gen " + record.gen + " / " + target + (running ? " · running" : "");
+  }
+
+  function doStep(){
+    const target = Number(els.genRange.value);
+    if (state.gen >= target) { pauseRun(); els.statusText.textContent = "gen " + state.gen + " · complete"; return; }
+    stepGeneration(state);
+    renderAll();
+  }
+
+  function pauseRun(){
+    running = false;
+    if (runTimer) { clearTimeout(runTimer); runTimer = null; }
+    els.runBtn.textContent = "Run";
+    setControlsDisabled(false);
+  }
+  function loopTick(){
+    if (!running) return;
+    const target = Number(els.genRange.value);
+    if (state.gen >= target){ pauseRun(); els.statusText.textContent = "gen " + state.gen + " · complete"; return; }
+    stepGeneration(state);
+    renderAll();
+    runTimer = setTimeout(loopTick, SPEED_MS[els.speedRange.value]);
+  }
+  function startRun(){
+    running = true;
+    els.runBtn.textContent = "Pause";
+    setControlsDisabled(true);
+    loopTick();
+  }
+  function setControlsDisabled(disabled){
+    els.popRange.disabled = disabled;
+    els.seedInput.disabled = disabled;
+    els.stepBtn.disabled = disabled;
+  }
+
+  function resetEvolution(){
+    pauseRun();
+    const popSize = Number(els.popRange.value);
+    const seed = currentSeed();
+    const mutationRate = Number(els.mutRange.value);
+    state = makeState(popSize, seed, mutationRate);
+    bestFitnessEver = 0;
+    stepGeneration(state);
+    renderAll();
+  }
+
+  /* ============================== WIRE UP ============================== */
+  function syncSwitchLocks(){
+    const activeCount = Object.values(objectives).filter(Boolean).length;
+    switches.forEach(sw=>{
+      const isLocked = objectives[sw.dataset.obj] && activeCount === 1;
+      sw.classList.toggle("locked", isLocked);
+      sw.setAttribute("aria-disabled", String(isLocked));
+    });
+  }
+  switches.forEach(sw=>{
+    sw.addEventListener("click", ()=>{
+      const key = sw.dataset.obj;
+      const activeCount = Object.values(objectives).filter(Boolean).length;
+      if (objectives[key] && activeCount === 1) return; // keep at least one on
+      objectives[key] = !objectives[key];
+      sw.setAttribute("aria-checked", String(objectives[key]));
+      syncSwitchLocks();
+      if (state){ state.objectives = objectives; if (state.history.length) renderAll(); }
+    });
+  });
+  syncSwitchLocks();
+
+  els.popRange.addEventListener("input", ()=>{ els.popVal.textContent = els.popRange.value; });
+  els.genRange.addEventListener("input", ()=>{ els.genVal.textContent = els.genRange.value; if(state) renderAll(); });
+  const SPEED_NAMES = {1:"slow",2:"med",3:"fast"};
+  els.speedRange.addEventListener("input", ()=>{ els.speedVal.textContent = SPEED_NAMES[els.speedRange.value]; });
+  els.mutRange.addEventListener("input", ()=>{ els.mutVal.textContent = Number(els.mutRange.value).toFixed(2); if(state) state.mutationRate = Number(els.mutRange.value); });
+
+  els.runBtn.addEventListener("click", ()=>{ running ? pauseRun() : startRun(); });
+  els.stepBtn.addEventListener("click", ()=>{ if(!running) doStep(); });
+  els.resetBtn.addEventListener("click", resetEvolution);
+
+  window.addEventListener("resize", ()=>{ if(state) renderAll(); });
+
+  /* ---- boot: show a real, already-evolved-one-generation state ---- */
+  resetEvolution();
+})();
+</script>
+</body>
+</html>

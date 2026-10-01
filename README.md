@@ -92,3 +92,73 @@ network access or API credentials.
   benchmark database — double-check a borderline match before buying.
 - PA-API rate limits apply (initially ~1 request/second, scaling with sales
   volume).
+
+# Paper Airplane Evolution
+
+A genetic algorithm that invents paper airplane fold parameters and scores
+each one with a simple flight-physics simulator, evolving better designs
+generation over generation. Three objectives can be switched on or off
+independently: **distance**, **time aloft**, and **speed**.
+
+## How it works
+
+- `paper_airplane_evolution/genome.py` — a paper airplane is encoded as 11
+  genes (wingspan, wing chord, fuselage length/width, nose weight
+  distribution, dihedral, nose taper angle, trim angle, nose fold layers,
+  wing sweep, tail fin height). Every genome is folded from the same
+  single A4 sheet: `Genome.repaired()` scales paper-consuming dimensions
+  down whenever a combination would need more flat area than one sheet
+  provides, and mass is fixed to the sheet's actual weight (folding
+  doesn't add or discard paper), so no design can be bigger, heavier, or
+  more capable than what's physically foldable -- that's what keeps
+  every evolved design fair and buildable.
+- `paper_airplane_evolution/simulator.py` — a toy glide-dynamics model
+  (lift/drag from wing area and aspect ratio, mass from paper + tape/folds)
+  integrates the flight from a fixed launch until it lands, returning
+  distance, time aloft, and top speed.
+- `paper_airplane_evolution/evolve.py` — a genetic algorithm (tournament
+  selection, uniform crossover, Gaussian mutation, elitism) optimizes a
+  weighted combination of whichever objectives are enabled.
+- `paper_airplane_evolution/design.py` — translates the winning genome back
+  into plain-English fold instructions.
+
+## Usage
+
+```bash
+# Optimize for all three objectives together (default if none are given)
+python -m paper_airplane_evolution --distance --time --speed
+
+# Optimize purely for distance
+python -m paper_airplane_evolution --distance --population 60 --generations 40
+
+# Save fitness-over-generations and best-trajectory plots (requires matplotlib)
+python -m paper_airplane_evolution --distance --time --plot
+```
+
+Options: `--distance`, `--time`, `--speed` (toggle objectives on/off),
+`--population`, `--generations`, `--mutation-rate`, `--seed`, `--quiet`,
+`--plot`.
+
+## Running tests
+
+```bash
+pytest tests/test_paper_airplane_evolution.py
+```
+
+## Visual, interactive version
+
+`paper_airplane_evolution/web/flight_test_bench.html` is a self-contained
+browser app — open it directly in any browser, no server or Python needed.
+It's a JavaScript port of the same genome/physics/GA engine (same bounds,
+same one-sheet fairness rule, same fixed mass) with a live interface:
+
+- Distance / time aloft / speed toggle switches, population and generation
+  sliders, and Run / Step / Reset controls (an Advanced panel exposes seed
+  and mutation rate for reproducible runs).
+- A flight-trace panel that animates the current best design's glide path.
+- A fitness-over-generations chart (best + average, with hover detail).
+- A population scatter (wingspan vs. nose-fold %) that visibly converges
+  generation by generation, colored by how close each design is to the
+  best fitness found so far.
+- A build sheet for the current best design, with a "Copy build sheet"
+  button.
