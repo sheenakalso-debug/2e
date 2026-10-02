@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4D Visualizer</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1d2330;
+    --muted: #677085;
+    --border: #dde1e8;
+    --accent: #3b6fe0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1017;
+      --panel: #161b25;
+      --text: #e6e9f0;
+      --muted: #8b93a7;
+      --border: #2a3140;
+      --accent: #7aa2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1017;
+    --panel: #161b25;
+    --text: #e6e9f0;
+    --muted: #8b93a7;
+    --border: #2a3140;
+    --accent: #7aa2ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    min-height: 100vh;
+  }
+  #stage { flex: 1; position: relative; min-width: 0; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  canvas:active { cursor: grabbing; }
+  #hint {
+    position: absolute; left: 16px; bottom: 12px;
+    color: var(--muted); font-size: 12px; pointer-events: none;
+  }
+  aside {
+    width: 300px; flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 16px; color: var(--muted); font-size: 12px; }
+  h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 18px 0 8px;
+  }
+  select, button {
+    width: 100%; padding: 7px 8px; font: inherit;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .row { display: grid; grid-template-columns: 34px 1fr 42px; align-items: center; gap: 8px; margin: 6px 0; }
+  .row label { font-family: ui-monospace, monospace; font-size: 12px; }
+  .row output { text-align: right; font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .check { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  #stats { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); margin-top: 16px; }
+  @media (max-width: 720px) {
+    body { flex-direction: column; }
+    #stage { height: 60vh; flex: none; }
+    aside { width: 100%; border-left: 0; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hint">Drag to orbit (3D) · Shift+drag to rotate through W · Scroll to zoom</div>
+</div>
+<aside>
+  <h1>4D Visualizer</h1>
+  <p class="sub">Rotates shapes in four dimensions, projects them 4D → 3D → 2D. Color shows the W coordinate.</p>
+
+  <h2>Shape</h2>
+  <select id="shape">
+    <option value="tesseract">Tesseract (8-cell hypercube)</option>
+    <option value="cell16">16-cell (hyper-octahedron)</option>
+    <option value="cell24">24-cell</option>
+    <option value="cell5">5-cell (hyper-tetrahedron)</option>
+    <option value="duoprism">6×6 Duoprism</option>
+    <option value="clifford">Clifford torus</option>
+    <option value="hopf">Hopf fibration (3-sphere)</option>
+  </select>
+
+  <h2>Rotation speed (per plane)</h2>
+  <div id="planes"></div>
+  <div class="btns">
+    <button id="pause">Pause</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <h2>Projection</h2>
+  <div class="row"><label>4D</label><input id="d4" type="range" min="1.5" max="6" step="0.1" value="2.6"><output id="d4o"></output></div>
+  <div class="row"><label>3D</label><input id="d3" type="range" min="2" max="10" step="0.1" value="4.5"><output id="d3o"></output></div>
+  <label class="check"><input id="persp4" type="checkbox" checked> 4D perspective (off = orthographic)</label>
+  <label class="check"><input id="showVerts" type="checkbox" checked> Show vertices</label>
+  <label class="check"><input id="trails" type="checkbox"> Motion trails</label>
+
+  <div id="stats"></div>
+</aside>
+
+<script>
+"use strict";
+
+// ---------- 4D geometry ----------
+
+// The six planes of rotation in 4D: every pair of axes (x=0, y=1, z=2, w=3).
+const PLANES = [
+  ["XY", 0, 1, 0.0],
+  ["XZ", 0, 2, 0.0],
+  ["XW", 0, 3, 0.35],
+  ["YZ", 1, 2, 0.15],
+  ["YW", 1, 3, 0.0],
+  ["ZW", 2, 3, 0.25],
+];
+
+function rotate4(v, i, j, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  const out = v.slice();
+  out[i] = c * v[i] - s * v[j];
+  out[j] = s * v[i] + c * v[j];
+  return out;
+}
+
+function edgesByDistance(verts, dist, eps = 1e-6) {
+  const edges = [];
+  for (let a = 0; a < verts.length; a++) {
+    for (let b = a + 1; b < verts.length; b++) {
+      let d = 0;
+      for (let k = 0; k < 4; k++) d += (verts[a][k] - verts[b][k]) ** 2;
+      if (Math.abs(Math.sqrt(d) - dist) < eps) edges.push([a, b]);
+    }
+  }
+  return edges;
+}
+
+function normalize(verts, radius = 1) {
+  let max = 0;
+  for (const v of verts) max = Math.max(max, Math.hypot(...v));
+  return verts.map(v => v.map(c => (c / max) * radius));
+}
+
+// Every permutation of an array (used for the 24-cell).
+function permutations(arr) {
+  if (arr.length <= 1) return [arr];
+  const out = [];
+  arr.forEach((x, i) => {
+    for (const p of permutations([...arr.slice(0, i), ...arr.slice(i + 1)])) out.push([x, ...p]);
+  });
+  return out;
+}
+
+const SHAPES = {
+  tesseract() {
+    const verts = [];
+    for (let i = 0; i < 16; i++) verts.push([0, 1, 2, 3].map(b => (i >> b & 1 ? 1 : -1)));
+    return { verts: normalize(verts), edges: edgesByDistance(verts, 2) };
+  },
+  cell16() {
+    const verts = [];
+    for (let k = 0; k < 4; k++) for (const s of [1, -1]) {
+      const v = [0, 0, 0, 0]; v[k] = s; verts.push(v);
+    }
+    return { verts, edges: edgesByDistance(verts, Math.SQRT2) };
+  },
+  cell24() {
+    const seen = new Set(), verts = [];
+    for (const p of permutations([1, 1, 0, 0])) for (let sgn = 0; sgn < 16; sgn++) {
+      const v = p.map((c, k) => (sgn >> k & 1 ? -c : c));
+      const key = v.join(",");
+      if (!seen.has(key)) { seen.add(key); verts.push(v); }
+    }
+    return { verts: normalize(verts), edges: edgesByDistance(verts, Math.SQRT2) };
+  },
+  cell5() {
+    const r5 = Math.sqrt(5);
+    const verts = [
+      [1, 1, 1, -1 / r5], [1, -1, -1, -1 / r5], [-1, 1, -1, -1 / r5],
+      [-1, -1, 1, -1 / r5], [0, 0, 0, r5 - 1 / r5],
+    ];
+    const edges = [];
+    for (let a = 0; a < 5; a++) for (let b = a + 1; b < 5; b++) edges.push([a, b]);
+    return { verts: normalize(verts), edges };
+  },
+  duoprism() {
+    const n = 6, verts = [], edges = [];
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const a = (2 * Math.PI * i) / n, b = (2 * Math.PI * j) / n;
+      verts.push([Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)]);
+      edges.push([i * n + j, i * n + (j + 1) % n], [i * n + j, ((i + 1) % n) * n + j]);
+    }
+    return { verts: normalize(verts), edges };
+  },
+  clifford() {
+    const n = 24, verts = [], edges = [], r = Math.SQRT1_2;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const a = (2 * Math.PI * i) / n, b = (2 * Math.PI * j) / n;
+      verts.push([r * Math.cos(a), r * Math.sin(a), r * Math.cos(b), r * Math.sin(b)]);
+      edges.push([i * n + j, i * n + (j + 1) % n], [i * n + j, ((i + 1) % n) * n + j]);
+    }
+    return { verts, edges, dense: true };
+  },
+  hopf() {
+    // Great circles on S^3 that are fibers of the Hopf map, chosen along a few
+    // latitudes of the base 2-sphere. Each fiber is a closed loop.
+    const verts = [], edges = [], seg = 48;
+    const lats = [0.35, 0.8, 1.25];
+    for (const eta of lats) {
+      const count = 10;
+      for (let f = 0; f < count; f++) {
+        const xi2 = (2 * Math.PI * f) / count;
+        const start = verts.length;
+        for (let s = 0; s < seg; s++) {
+          const xi1 = (2 * Math.PI * s) / seg;
+          const half = eta / 2;
+          verts.push([
+            Math.cos(xi1 + xi2) * Math.sin(half),
+            Math.sin(xi1 + xi2) * Math.sin(half),
+            Math.cos(xi1 - xi2) * Math.cos(half),
+            Math.sin(xi1 - xi2) * Math.cos(half),
+          ]);
+          edges.push([start + s, start + (s + 1) % seg]);
+        }
+      }
+    }
+    return { verts, edges, dense: true };
+  },
+};
+
+// ---------- State ----------
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const ui = id => document.getElementById(id);
+
+const state = {
+  shape: null,
+  angles4: PLANES.map(() => 0),
+  speeds: PLANES.map(p => p[3]),
+  orbit: { yaw: 0.6, pitch: -0.35 },
+  zoom: 1,
+  paused: false,
+};
+
+function loadShape(name) {
+  state.shape = SHAPES[name]();
+  ui("stats").textContent =
+    `${state.shape.verts.length} vertices · ${state.shape.edges.length} edges`;
+  clearTrails = true;
+}
+
+// ---------- Controls ----------
+
+const planesEl = ui("planes");
+PLANES.forEach(([name], idx) => {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML =
+    `<label>${name}</label>` +
+    `<input type="range" min="-1.5" max="1.5" step="0.01" value="${state.speeds[idx]}">` +
+    `<output>${state.speeds[idx].toFixed(2)}</output>`;
+  const input = row.querySelector("input"), out = row.querySelector("output");
+  input.addEventListener("input", () => {
+    state.speeds[idx] = +input.value;
+    out.textContent = (+input.value).toFixed(2);
+  });
+  planesEl.appendChild(row);
+});
+
+function bindOutput(id) {
+  const input = ui(id), out = ui(id + "o");
+  const sync = () => (out.textContent = (+input.value).toFixed(1));
+  input.addEventListener("input", sync);
+  sync();
+}
+bindOutput("d4");
+bindOutput("d3");
+
+ui("shape").addEventListener("change", e => loadShape(e.target.value));
+ui("pause").addEventListener("click", () => {
+  state.paused = !state.paused;
+  ui("pause").textContent = state.paused ? "Play" : "Pause";
+});
+ui("reset").addEventListener("click", () => {
+  state.angles4 = PLANES.map(() => 0);
+  state.orbit = { yaw: 0.6, pitch: -0.35 };
+  state.zoom = 1;
+  clearTrails = true;
+});
+
+// Mouse / touch: drag orbits the 3D camera; shift-drag rotates in XW / YW.
+let drag = null;
+canvas.addEventListener("pointerdown", e => {
+  drag = { x: e.clientX, y: e.clientY, shift: e.shiftKey };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = (e.clientX - drag.x) * 0.01, dy = (e.clientY - drag.y) * 0.01;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.shift || e.shiftKey) {
+    state.angles4[2] += dx; // XW
+    state.angles4[4] += dy; // YW
+  } else {
+    state.orbit.yaw += dx;
+    state.orbit.pitch = Math.max(-1.5, Math.min(1.5, state.orbit.pitch + dy));
+  }
+});
+canvas.addEventListener("pointerup", () => (drag = null));
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  state.zoom = Math.max(0.3, Math.min(4, state.zoom * Math.exp(-e.deltaY * 0.001)));
+}, { passive: false });
+
+// ---------- Rendering ----------
+
+let clearTrails = true;
+let width = 0, height = 0, dpr = 1;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const r = canvas.parentElement.getBoundingClientRect();
+  width = r.width; height = r.height;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  clearTrails = true;
+}
+window.addEventListener("resize", resize);
+
+// Map w to a hue: blue (w<0, "behind" in 4D) → magenta → orange (w>0, "in front").
+function wColor(w, alpha) {
+  const t = Math.max(0, Math.min(1, (w / 0.8 + 1) / 2));
+  const hue = 215 + 175 * t;
+  return `hsla(${hue % 360}, 80%, 55%, ${alpha})`;
+}
+
+function project(v4) {
+  const d4 = +ui("d4").value, d3 = +ui("d3").value;
+
+  // 4D → 3D: perspective divide by distance along W.
+  // Normalized so a point at w = 0 keeps its size.
+  const k4 = ui("persp4").checked ? d4 / (d4 - v4[3]) : 1;
+  let x = v4[0] * k4, y = v4[1] * k4, z = v4[2] * k4;
+
+  // 3D orbit camera.
+  const { yaw, pitch } = state.orbit;
+  let c = Math.cos(yaw), s = Math.sin(yaw);
+  [x, z] = [c * x + s * z, -s * x + c * z];
+  c = Math.cos(pitch); s = Math.sin(pitch);
+  [y, z] = [c * y - s * z, s * y + c * z];
+
+  // 3D → 2D: perspective divide by distance along Z.
+  // k3 is 1 at z = 0, larger for nearer points.
+  const k3 = d3 / (d3 - z);
+  const scale = Math.min(width, height) * 0.28 * state.zoom;
+  return { x: width / 2 + x * k3 * scale, y: height / 2 - y * k3 * scale, depth: z, w: v4[3], k3 };
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (!state.paused) state.speeds.forEach((sp, i) => (state.angles4[i] += sp * dt));
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = getComputedStyle(document.body).backgroundColor;
+  if (ui("trails").checked && !clearTrails) {
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+    clearTrails = false;
+  }
+
+  const { verts, edges, dense } = state.shape;
+  const pts = verts.map(v => {
+    let r = v;
+    PLANES.forEach(([, i, j], idx) => (r = rotate4(r, i, j, state.angles4[idx])));
+    return project(r);
+  });
+
+  // Painter's algorithm: draw far edges first.
+  const order = edges
+    .map((e, idx) => ({ idx, depth: pts[e[0]].depth + pts[e[1]].depth }))
+    .sort((a, b) => a.depth - b.depth);
+
+  ctx.lineCap = "round";
+  for (const { idx } of order) {
+    const [a, b] = edges[idx], p = pts[a], q = pts[b];
+    const w = (p.w + q.w) / 2;
+    const near = Math.max(0.35, Math.min(1.4, (p.k3 + q.k3) / 2));
+    ctx.strokeStyle = wColor(w, Math.min(1, (dense ? 0.6 : 0.85) * near));
+    ctx.lineWidth = (dense ? 1.4 : 2.6) * near * Math.sqrt(state.zoom);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(q.x, q.y);
+    ctx.stroke();
+  }
+
+  if (ui("showVerts").checked && !dense) {
+    for (const p of [...pts].sort((a, b) => a.depth - b.depth)) {
+      const r = Math.max(2, 4.5 * p.k3 * Math.sqrt(state.zoom));
+      ctx.fillStyle = wColor(p.w, 1);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+resize();
+loadShape("tesseract");
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -92,3 +92,17 @@ network access or API credentials.
   benchmark database — double-check a borderline match before buying.
 - PA-API rate limits apply (initially ~1 request/second, scaling with sales
   volume).
+
+## 4D Visualizer
+
+`visuals_4d/index.html` is a standalone, dependency-free page that renders
+four-dimensional shapes. Open it in any browser — no build step or server needed.
+
+- **Shapes:** tesseract, 16-cell, 24-cell, 5-cell, 6×6 duoprism, Clifford torus,
+  and Hopf fibration fibers on the 3-sphere.
+- **Rotation:** independent speed sliders for all six 4D rotation planes
+  (XY, XZ, XW, YZ, YW, ZW).
+- **Projection:** 4D → 3D perspective (or orthographic), then 3D → 2D perspective.
+  Edge/vertex color encodes the W coordinate (blue = negative W, orange = positive W).
+- **Interaction:** drag to orbit the 3D camera, Shift+drag to rotate through W,
+  scroll to zoom, optional motion trails.
